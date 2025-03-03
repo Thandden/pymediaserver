@@ -24,3 +24,5 @@ logs/
 .env
 # Cache Files
 *.cache
+
+.cursorrules
