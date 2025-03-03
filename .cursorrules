@@ -1,0 +1,160 @@
+Python Rules (Coding Standards)
+
+1. Type Hinting & Static Analysis
+All code must pass pyright --strict.
+
+Explicitly type hint all variables, return types, parameters, and class attributes.
+
+Use TypeVar, Protocol, and @override where appropriate.
+
+All code MUST be type safe as possible.
+
+python
+
+def calculate_total(items: list[float], tax_rate: float) -> float: ...  
+Use typing module utilities (e.g., Literal, TypedDict) for complex types.
+
+Prohibit Any unless absolutely unavoidable (include # type: ignore with justification).
+
+2. PEP Compliance
+Follow PEP 8 (style), PEP 585 (type hints), PEP 604 (union syntax), and PEP 692 (typed dict kwargs).
+
+
+Line length: 120 characters max.
+
+3. Imports
+Always use absolute imports:
+
+python
+# Good  
+from src.utils.logger import get_logger  
+
+# Bad  
+from ..utils.logger import get_logger  
+Structure projects as installable packages (use pyproject.toml and src/ layout).
+
+4. Function Design
+Single Responsibility Principle:
+
+python
+# Good: Separate validation and processing  
+def validate_user(user: User) -> bool: ...  
+def save_user(user: User) -> None: ...  
+
+# Bad: Combined responsibilities  
+def handle_user(user: User) -> None: ...  
+Early Returns:
+
+python
+def process_data(data: list[str] | None) -> bool:  
+    if not data:  
+        return False  
+    # Process data...  
+    return True  
+5. Data Handling
+Simple Data Containers:
+
+python
+from dataclasses import dataclass  
+
+@dataclass  
+class Coordinate:  
+    x: float  
+    y: float  
+Complex Validation:
+
+python
+from pydantic import BaseModel  
+
+class User(BaseModel):  
+    id: UUID  
+    email: EmailStr  
+6. Testing
+Structure:
+
+python
+# tests/test_math.py  
+def test_add_negative_numbers():  
+    assert add(-1, -2) == -3  
+Use pytest.fixture for shared resources.
+
+Cover edge cases (empty inputs, extremes, invalid types).
+
+7. Database
+SQLAlchemy ORM (Declarative Base):
+Use Annotated Declarative Table (Type Annotated Forms for mapped_column())
+python
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column  
+
+class Base(DeclarativeBase): ...  
+
+class User(Base):  
+    __tablename__ = "users"  
+    id: Mapped[int] = mapped_column(primary_key=True)  
+Use select() queries:
+
+python
+from sqlalchemy import select  
+stmt = select(User).where(User.email == "test@example.com")  
+8. Tooling
+Dependency Management:
+
+Use uv pip install instead of pip (faster installations).
+
+Pin dependencies in requirements.txt or pyproject.toml.
+
+Pre-Commit Hooks:
+
+yaml
+# .pre-commit-config.yaml  
+repos:  
+  - repo: https://github.com/astral-sh/ruff-pre-commit  
+    rev: v0.4.7  
+    hooks: [ { id: ruff, args: ["--fix"] } ]  
+9. Modularity
+Split logic into reusable modules:
+
+src/  
+  ├── core/  
+  │   ├── models.py  
+  │   └── utils.py  
+  └── api/  
+      └── routes.py  
+Avoid circular imports.
+
+10. Naming Conventions
+Variables/Functions: snake_case, descriptive (e.g., user_age, calculate_interest).
+
+Classes: PascalCase (e.g., BankAccount).
+
+Constants: UPPER_SNAKE_CASE (e.g., MAX_RETRIES).
+
+Enforcement:
+
+Code reviews must verify these rules.
+
+CI pipeline runs pyright, pytest, black --check, and ruff.
+
+Exceptions:
+
+Document any deviations with reasoning in code comments.
+
+11. Documentation
+
+All public functions, classes, and modules must have docstrings.
+
+Use Google-style docstrings for functions and classes.
+
+Example:
+def calculate_total(items: list[float], tax_rate: float) -> float:
+    """Calculate total amount including tax.
+
+    Args:
+        items (list[float]): List of float values representing item prices.
+        tax_rate (float): Float value representing tax rate (e.g., 0.05 for 5%).
+
+    Returns:
+        Float value representing total amount including tax.
+    """
+    return sum(items) * (1 + tax_rate)
+
