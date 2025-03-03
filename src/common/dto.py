@@ -33,14 +33,12 @@ def validate_uuid(v: str) -> str:
     return v
 
 
-
 class JobParams(BaseModel):
     pass
 
 
 class DTO(BaseModel):
     pass
-
 
 
 class MediaScannerParams(JobParams):
@@ -241,4 +239,3 @@ class ServiceDTO(DTO):
 
 ChildJobRequest: TypeAlias = JobDTO
 NoChildJob: TypeAlias = None
-

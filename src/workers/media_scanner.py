@@ -36,7 +36,7 @@ class MediaScanner(Worker):
         """
         if not isinstance(parameters, MediaScannerParams):
             raise ValueError("Parameters must be of type MediaScannerParams")
-        
+
         found_files = await self._scan_directory(
             parameters.dir_path, parameters.file_extensions
         )
@@ -44,14 +44,18 @@ class MediaScanner(Worker):
         # Get existing files from database and convert to set for efficient lookups
         existing_files = await self._get_all_files()
         existing_file_paths = set(file.path for file in existing_files)
-        
+
         # Find unique files (those not already in the database)
-        unique_files = [file_path for file_path in found_files if file_path not in existing_file_paths]
-        
+        unique_files = [
+            file_path
+            for file_path in found_files
+            if file_path not in existing_file_paths
+        ]
+
         # Create a job for each unique file found
         indexed_files: list[FileDTO] = []
         child_jobs: list[ChildJobRequest] = []
-        
+
         for file_path in unique_files:
             file_id = str(uuid.uuid4())
             md5_hash = await self._calculate_md5(file_path)
@@ -74,7 +78,7 @@ class MediaScanner(Worker):
                     ),
                 )
             )
-        
+
         if indexed_files:
             await self._update_db(indexed_files)
 
@@ -103,7 +107,7 @@ class MediaScanner(Worker):
             if self.logger:
                 self.logger.error(f"Error fetching files: {e}")
             return []  # Return empty list on exception
-        
+
         # Return empty list if no session was yielded
         return []
 

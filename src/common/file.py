@@ -1,7 +1,7 @@
 import os
 import hashlib
 from src.common.logger import Logger
-from typing import Optional, List, Set
+from typing import Optional, Set
 
 import aiofiles
 import aiofiles.os
@@ -40,20 +40,20 @@ async def calculate_md5(file_path: str, chunk_size: int = 4096) -> str:
 
 
 async def scan_directory(
-    directory_path: str, file_extensions: List[str], logger: Optional[Logger] = None
-) -> List[str]:
+    directory_path: str, file_extensions: list[str], logger: Optional[Logger] = None
+) -> list[str]:
     """
     Scan a directory for files with specified extensions
 
     Args:
         directory_path: Path to scan
-        file_extensions: List of file extensions to look for
+        file_extensions: list of file extensions to look for
         logger: Optional logger for debug information
 
     Returns:
-        List of file paths that match the criteria
+        list of file paths that match the criteria
     """
-    matching_files: List[str] = []
+    matching_files: list[str] = []
     lowercase_extensions: Set[str] = {ext.lower() for ext in file_extensions}
 
     if logger:

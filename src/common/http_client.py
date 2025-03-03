@@ -1,9 +1,9 @@
 import aiohttp
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Dict, Any, Optional, AsyncIterator, TypeVar, Type
+from typing import Any, Optional, AsyncIterator, TypeVar, Type
 
-T = TypeVar("T")
+# T = TypeVar("T")
 
 
 class AsyncHttpClient:
@@ -27,10 +27,10 @@ class AsyncHttpClient:
         return self
 
     async def __aexit__(
-        self, 
-        exc_type: Optional[Type[BaseException]], 
-        exc_val: Optional[BaseException], 
-        exc_tb: Optional[Any]
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
     ) -> None:
         """Cleanup client session when exiting context."""
         if self._session:
@@ -46,7 +46,7 @@ class AsyncHttpClient:
     async def fetch_data(
         self,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
+        params: Optional[dict[str, Any]] = None,
     ) -> Optional[aiohttp.ClientResponse]:
         """
         Perform an asynchronous GET request with retry mechanism.
@@ -97,7 +97,7 @@ class AsyncHttpClient:
             if not response.closed:
                 try:
                     # Ensure close() method exists and is callable
-                    close_method = getattr(response, 'close', None)
+                    close_method = getattr(response, "close", None)
                     if close_method is not None and callable(close_method):
                         await close_method()
                 except (TypeError, AttributeError):
@@ -106,8 +106,8 @@ class AsyncHttpClient:
     async def fetch_json(
         self,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        params: Optional[dict[str, Any]] = None,
+    ) -> Optional[dict[str, Any]]:
         """
         Convenience method to fetch and parse JSON data.
         :param endpoint: The API endpoint to request

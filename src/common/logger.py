@@ -5,7 +5,7 @@ Custom logger module that provides context-aware logging functionality.
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional, Self
+from typing import Any, Optional, Self
 import logging
 import sys
 
@@ -26,7 +26,7 @@ class Logger:
 
     name: str
     level: LogLevel
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     _logger: Optional[logging.Logger] = None
 
     def __post_init__(self) -> None:

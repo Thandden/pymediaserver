@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any, Final, Optional, Type
+from typing import Any, Optional, Type
 
 from sqlalchemy import (
     CHAR,
@@ -37,18 +37,21 @@ class GUID(TypeDecorator[uuid.UUID]):
     Uses PostgreSQL's UUID type, otherwise uses
     CHAR(32), storing as stringified hex values.
     """
+
     impl = CHAR
 
     def load_dialect_impl(self, dialect: Any) -> Any:
-        if dialect.name == 'postgresql':
+        if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         else:
             return dialect.type_descriptor(CHAR(32))
 
-    def process_bind_param(self, value: Optional[uuid.UUID], dialect: Any) -> Optional[str]:
+    def process_bind_param(
+        self, value: Optional[uuid.UUID], dialect: Any
+    ) -> Optional[str]:
         if value is None:
             return value
-        elif dialect.name == 'postgresql':
+        elif dialect.name == "postgresql":
             return str(value)
         else:
             if not isinstance(value, uuid.UUID):
@@ -57,7 +60,9 @@ class GUID(TypeDecorator[uuid.UUID]):
                 # hexstring
                 return "%.32x" % value.int
 
-    def process_result_value(self, value: Optional[str], dialect: Any) -> Optional[uuid.UUID]:
+    def process_result_value(
+        self, value: Optional[str], dialect: Any
+    ) -> Optional[uuid.UUID]:
         if value is None:
             return value
         else:
@@ -73,10 +78,11 @@ class Base(DeclarativeBase):
 # First, let's define a helper function to create enum columns consistently
 def enum_column(enum_class: Type[enum.Enum], **kwargs: Any) -> Mapped[Any]:
     """Helper function to create enum columns with consistent behavior"""
+
     # Create a function that captures enum_class properly
     def get_values(x: Any) -> list[str]:
         return [e.value for e in enum_class]
-    
+
     return mapped_column(
         Enum(
             enum_class,
@@ -90,9 +96,7 @@ def enum_column(enum_class: Type[enum.Enum], **kwargs: Any) -> Mapped[Any]:
 class File(Base):
     __tablename__ = "files"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     path: Mapped[str] = mapped_column(String, nullable=False)
     media_type: Mapped[MediaType] = mapped_column(
         Enum(MediaType, name="mediatype_enum"), nullable=False
@@ -122,10 +126,11 @@ class Entity(Base):
     __tablename__ = "entities"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
-    file_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("files.id", ondelete="CASCADE"), type_=GUID)
+    file_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("files.id", ondelete="CASCADE"), type_=GUID
+    )
     entity_type: Mapped[EntityType] = mapped_column(
-        Enum(EntityType, name="entitytype_enum", native_enum=False), 
-        nullable=False
+        Enum(EntityType, name="entitytype_enum", native_enum=False), nullable=False
     )
     movie_id: Mapped[Optional[str]] = mapped_column(ForeignKey("movies.id"))
     tv_episode_id: Mapped[Optional[str]] = mapped_column(ForeignKey("tv_episodes.id"))
@@ -159,9 +164,7 @@ class Entity(Base):
 class TVShow(Base):
     __tablename__ = "tv_shows"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     tmdb_id: Mapped[Optional[int]] = mapped_column(unique=True)
     title: Mapped[str]
     overview: Mapped[Optional[str]]
@@ -183,9 +186,7 @@ class TVShow(Base):
 class TVSeason(Base):
     __tablename__ = "tv_seasons"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     show_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tv_shows.id", ondelete="CASCADE"), type_=GUID
     )
@@ -215,9 +216,7 @@ class TVSeason(Base):
 class TVEpisode(Base):
     __tablename__ = "tv_episodes"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     season_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tv_seasons.id", ondelete="CASCADE"), type_=GUID
     )
@@ -247,9 +246,7 @@ class TVEpisode(Base):
 class Movie(Base):
     __tablename__ = "movies"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     tmdb_id: Mapped[Optional[int]] = mapped_column(unique=True)
     title: Mapped[str]
     overview: Mapped[Optional[str]]
@@ -270,12 +267,8 @@ class Movie(Base):
 class MediaTechnicalInfo(Base):
     __tablename__ = "media_technical_info"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID, primary_key=True, default=uuid.uuid4
-    )
-    file_id: Mapped[str] = mapped_column(
-        ForeignKey("files.id", ondelete="CASCADE")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    file_id: Mapped[str] = mapped_column(ForeignKey("files.id", ondelete="CASCADE"))
     duration: Mapped[Optional[int]]  # Duration in seconds
     bitrate: Mapped[Optional[int]]  # Overall bitrate
     container_format: Mapped[Optional[str]]  # Container format (mp4, mkv, etc.)
@@ -288,8 +281,12 @@ class MediaTechnicalInfo(Base):
 
     # Relationships
     file: Mapped[File] = relationship(back_populates="technical_info")
-    video_tracks: Mapped[list["VideoTrack"]] = relationship(back_populates="technical_info", cascade="all, delete-orphan")
-    audio_tracks: Mapped[list["AudioTrack"]] = relationship(back_populates="technical_info", cascade="all, delete-orphan")
+    video_tracks: Mapped[list["VideoTrack"]] = relationship(
+        back_populates="technical_info", cascade="all, delete-orphan"
+    )
+    audio_tracks: Mapped[list["AudioTrack"]] = relationship(
+        back_populates="technical_info", cascade="all, delete-orphan"
+    )
 
 
 class VideoTrack(Base):
@@ -297,8 +294,7 @@ class VideoTrack(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     technical_info_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("media_technical_info.id", ondelete="CASCADE"), 
-        type_=GUID
+        ForeignKey("media_technical_info.id", ondelete="CASCADE"), type_=GUID
     )
     track_index: Mapped[int]  # Track number in the container
     width: Mapped[Optional[int]]  # Video width in pixels
@@ -318,11 +314,15 @@ class VideoTrack(Base):
     )
 
     # Relationships
-    technical_info: Mapped[MediaTechnicalInfo] = relationship(back_populates="video_tracks")
+    technical_info: Mapped[MediaTechnicalInfo] = relationship(
+        back_populates="video_tracks"
+    )
 
     # Constraints
     __table_args__ = (
-        UniqueConstraint("technical_info_id", "track_index", name="uq_video_track_per_media"),
+        UniqueConstraint(
+            "technical_info_id", "track_index", name="uq_video_track_per_media"
+        ),
     )
 
 
@@ -331,8 +331,7 @@ class AudioTrack(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     technical_info_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("media_technical_info.id", ondelete="CASCADE"), 
-        type_=GUID
+        ForeignKey("media_technical_info.id", ondelete="CASCADE"), type_=GUID
     )
     track_index: Mapped[int]  # Track number in the container
     codec: Mapped[Optional[str]]  # Audio codec (aac, ac3, etc.)
@@ -350,20 +349,22 @@ class AudioTrack(Base):
     )
 
     # Relationships
-    technical_info: Mapped[MediaTechnicalInfo] = relationship(back_populates="audio_tracks")
+    technical_info: Mapped[MediaTechnicalInfo] = relationship(
+        back_populates="audio_tracks"
+    )
 
     # Constraints
     __table_args__ = (
-        UniqueConstraint("technical_info_id", "track_index", name="uq_audio_track_per_media"),
+        UniqueConstraint(
+            "technical_info_id", "track_index", name="uq_audio_track_per_media"
+        ),
     )
 
 
 class TranscodingSession(Base):
     __tablename__ = "transcoding_sessions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     file_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("files.id"), type_=GUID)
     user_id: Mapped[uuid.UUID]  # Reference to user table (not shown)
     current_timestamp: Mapped[Optional[int]]  # Current playback position in seconds
@@ -384,9 +385,7 @@ class TranscodingSession(Base):
 class Job(Base):
     __tablename__ = "jobs"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     job_type: Mapped[JobType] = enum_column(JobType)
     status: Mapped[JobStatus] = enum_column(JobStatus, default=JobStatus.OPEN)
     parameters: Mapped[dict[str, Any]] = mapped_column(JSON)
@@ -425,9 +424,7 @@ class Job(Base):
 class Service(Base):
     __tablename__ = "services"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     service_type: Mapped[ServiceType] = enum_column(ServiceType)
     status: Mapped[ServiceStatus] = enum_column(
         ServiceStatus, default=ServiceStatus.INACTIVE

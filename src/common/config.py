@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, TypeVar, Generic, cast, Type, get_type_hints
+from typing import Any, Optional, TypeVar, Generic, cast, Type, get_type_hints
 
 from dotenv import load_dotenv
 
@@ -48,20 +48,24 @@ class ConfigValue(Generic[T]):
             ValueError: If the variable is required but not set
         """
         value = os.environ.get(self.env_name)
-        
+
         if value is None:
             if self.required and self.default is None:
-                raise ValueError(f"Required environment variable {self.env_name} is not set")
+                raise ValueError(
+                    f"Required environment variable {self.env_name} is not set"
+                )
             return cast(T, self.default)
-        
+
         if self.value_type is bool and not isinstance(self.default, bool):
             return cast(T, value.lower() in ("true", "1", "yes", "y", "t"))
         elif self.value_type is not None:
             try:
                 return cast(T, self.value_type(value))
             except ValueError:
-                raise ValueError(f"Cannot convert {self.env_name}={value} to {self.value_type.__name__}")
-        
+                raise ValueError(
+                    f"Cannot convert {self.env_name}={value} to {self.value_type.__name__}"
+                )
+
         return cast(T, value)
 
 
@@ -72,22 +76,22 @@ class Config:
     APP_NAME: str = ConfigValue("APP_NAME", "MediaApp")
     DEBUG: bool = ConfigValue("DEBUG", False, bool)
     ENV: str = ConfigValue("ENV", "development")
-    
+
     # Database settings
     DATABASE_URL: str = ConfigValue("DATABASE_URL", "sqlite:///media.db")
     DB_POOL_SIZE: int = ConfigValue("DB_POOL_SIZE", 5, int)
-    
+
     # API settings
     TMDB_API_KEY: str = ConfigValue("TMDB_API_KEY", required=True)
     TMDB_API_URL: str = ConfigValue("TMDB_API_URL", "https://api.themoviedb.org/3")
-    
+
     # Service settings
     SERVICE_HEARTBEAT_INTERVAL: int = ConfigValue("SERVICE_HEARTBEAT_INTERVAL", 30, int)
     JOB_POLL_INTERVAL: int = ConfigValue("JOB_POLL_INTERVAL", 5, int)
-    
+
     # File settings
     MEDIA_DIRECTORY: str = ConfigValue("MEDIA_DIRECTORY", str(Path.home() / "media"))
-    
+
     # Logging
     LOG_LEVEL: str = ConfigValue("LOG_LEVEL", "INFO")
     LOG_TO_FILE: bool = ConfigValue("LOG_TO_FILE", False, bool)
@@ -96,7 +100,7 @@ class Config:
     def __init__(self, env_file: Optional[str] = None) -> None:
         """
         Initialize the configuration by loading environment variables.
-        
+
         Args:
             env_file: Optional path to .env file
         """
@@ -106,15 +110,15 @@ class Config:
         else:
             # Look for .env file in standard locations
             load_dotenv()  # Default looks in current directory and parent
-        
-    def as_dict(self) -> Dict[str, Any]:
+
+    def as_dict(self) -> dict[str, Any]:
         """
         Get all configuration values as a dictionary.
-        
+
         Returns:
-            Dictionary of configuration values
+            dictionary of configuration values
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         for key, _ in get_type_hints(self.__class__).items():
             if not key.startswith("_") and hasattr(self, key):
                 result[key] = getattr(self, key)
@@ -122,4 +126,4 @@ class Config:
 
 
 # Create a singleton instance for easy importing
-config = Config() 
+config = Config()
