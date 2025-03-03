@@ -26,3 +26,17 @@ logs/
 *.cache
 
 .cursorrules
+
+# Video files
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mpeg
+
+# DB files
+*.db
+*.db-shm
+*.db-wal

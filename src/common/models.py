@@ -17,7 +17,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import UUID as SQLAlchemyUUID
 from src.common.system_types import (
     MediaType,
     EntityType,
@@ -54,10 +53,10 @@ class GUID(TypeDecorator[uuid.UUID]):
         elif dialect.name == "postgresql":
             return str(value)
         else:
-            if not isinstance(value, uuid.UUID):
-                return "%.32x" % uuid.UUID(value).int
-            else:
-                # hexstring
+            try:
+                return "%.32x" % uuid.UUID(str(value)).int
+            except (AttributeError, ValueError, TypeError):
+                # Already a UUID
                 return "%.32x" % value.int
 
     def process_result_value(
@@ -454,3 +453,151 @@ class Service(Base):
             postgresql_where="status = 'ACTIVE'",
         ),
     )
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    username: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    playback_sessions: Mapped[list["PlaybackSession"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class ClientProfile(Base):
+    __tablename__ = "client_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    client_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    device_type: Mapped[Optional[str]] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    last_used_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationships
+    codec_supports: Mapped[list["ProfileCodecSupport"]] = relationship(
+        back_populates="profile", cascade="all, delete-orphan"
+    )
+    playback_sessions: Mapped[list["PlaybackSession"]] = relationship(
+        back_populates="profile"
+    )
+
+
+class CodecFormat(Base):
+    __tablename__ = "codec_formats"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    video_codec: Mapped[str] = mapped_column(String, nullable=False)
+    video_profile: Mapped[Optional[str]] = mapped_column(String)
+    bit_depth: Mapped[Optional[int]]
+    color_space: Mapped[Optional[str]] = mapped_column(String)
+    max_resolution: Mapped[Optional[str]] = mapped_column(String)
+    audio_codec: Mapped[str] = mapped_column(String, nullable=False)
+    container_format: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationships
+    profile_supports: Mapped[list["ProfileCodecSupport"]] = relationship(
+        back_populates="codec_format", cascade="all, delete-orphan"
+    )
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint(
+            "video_codec", 
+            "video_profile", 
+            "bit_depth", 
+            "audio_codec", 
+            "container_format",
+            name="uq_codec_format"
+        ),
+    )
+
+
+class ProfileCodecSupport(Base):
+    __tablename__ = "profile_codec_support"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("client_profiles.id", ondelete="CASCADE"), type_=GUID
+    )
+    codec_format_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("codec_formats.id", ondelete="CASCADE"), type_=GUID
+    )
+    is_supported: Mapped[bool] = mapped_column(nullable=False)
+    confidence: Mapped[int] = mapped_column(default=100)
+    notes: Mapped[Optional[str]] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    profile: Mapped[ClientProfile] = relationship(back_populates="codec_supports")
+    codec_format: Mapped[CodecFormat] = relationship(back_populates="profile_supports")
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint("profile_id", "codec_format_id", name="uq_profile_codec"),
+    )
+
+
+class PlaybackSession(Base):
+    __tablename__ = "playback_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), type_=GUID
+    )
+    file_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("files.id", ondelete="CASCADE"), type_=GUID
+    )
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("client_profiles.id", ondelete="CASCADE"), type_=GUID
+    )
+    transcoding_session_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("transcoding_sessions.id", ondelete="SET NULL"), type_=GUID
+    )
+    current_position: Mapped[int] = mapped_column(default=0)
+    duration: Mapped[Optional[int]]
+    watched_percentage: Mapped[float] = mapped_column(default=0.0)
+    is_completed: Mapped[bool] = mapped_column(default=False)
+    selected_audio_track: Mapped[Optional[int]]
+    selected_subtitle_track: Mapped[Optional[int]]
+    started_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
+    last_updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
+    completed_at: Mapped[Optional[datetime]]
+
+    # Relationships
+    user: Mapped[User] = relationship(back_populates="playback_sessions")
+    file: Mapped[File] = relationship()
+    profile: Mapped[ClientProfile] = relationship(back_populates="playback_sessions")
+    transcoding_session: Mapped[Optional[TranscodingSession]] = relationship()

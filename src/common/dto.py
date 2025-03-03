@@ -76,6 +76,9 @@ class TvMatcherParams(JobParams):
     season_number: int
     episode_number: int
 
+class FFProbeParams(JobParams):
+    file_id: UUID4
+    path: str
 
 class JobDTO(DTO):
     id: Optional[UUID4] = Field(default_factory=lambda: uuid.uuid4())
