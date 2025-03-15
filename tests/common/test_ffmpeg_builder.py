@@ -16,7 +16,10 @@ def test_minimal_valid_command() -> None:
         .set_output_path("output")
         .build()
     )
-    assert cmd == 'ffmpeg -i "input.mp4" -c:v libx264 -f segment "output_%03d.ts"'
+    assert (
+        cmd
+        == "ffmpeg -i input.mp4 -c:v libx264 -f segment -segment_format mpegts output_%03d.ts"
+    )
 
 
 def test_full_command_all_options() -> None:
@@ -34,9 +37,9 @@ def test_full_command_all_options() -> None:
         .build()
     )
     expected = (
-        'ffmpeg -i "input.mp4" -c:v libx265 -vf scale=1920x1080 '
+        "ffmpeg -i input.mp4 -c:v libx265 -vf scale=1920x1080 "
         "-pix_fmt yuv420p10le -preset slow -c:a aac -f segment "
-        '-segment_time 4 "output_%03d.ts"'
+        "-segment_time 4 -segment_format mpegts output_%03d.ts"
     )
     assert cmd == expected
 
@@ -50,7 +53,10 @@ def test_audio_only_command() -> None:
         .set_output_path("output")
         .build()
     )
-    assert cmd == 'ffmpeg -i "input.mp4" -c:a aac -f segment "output_%03d.ts"'
+    assert (
+        cmd
+        == "ffmpeg -i input.mp4 -c:a aac -f segment -segment_format mpegts output_%03d.ts"
+    )
 
 
 def test_color_depth_options() -> None:
@@ -97,8 +103,8 @@ def test_paths_with_spaces() -> None:
         .set_output_path("output folder/segment")
         .build()
     )
-    assert 'ffmpeg -i "input file.mp4"' in cmd
-    assert '"output folder/segment_%03d.ts"' in cmd
+    assert "ffmpeg -i input file.mp4" in cmd
+    assert "output folder/segment_%03d.ts" in cmd
 
 
 def test_resolution_settings() -> None:
@@ -287,8 +293,8 @@ def test_timestamp_with_full_command() -> None:
         .build()
     )
     expected = (
-        'ffmpeg -ss 00:05:00 -i "input.mp4" -c:v libx265 -vf scale=1920x1080 '
+        "ffmpeg -ss 00:05:00 -i input.mp4 -c:v libx265 -vf scale=1920x1080 "
         "-pix_fmt yuv420p10le -preset slow -c:a aac -f segment "
-        '-segment_time 4 "output_%03d.ts"'
+        "-segment_time 4 -segment_format mpegts output_%03d.ts"
     )
     assert cmd == expected

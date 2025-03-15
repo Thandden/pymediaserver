@@ -96,8 +96,9 @@ async def test_execute_with_no_files(media_scanner: MediaScanner) -> None:
 @pytest.mark.asyncio
 async def test_execute_with_new_files(media_scanner: MediaScanner) -> None:
     """Test execute method with new files found."""
-    # Generate a real version 4 UUID
+    # Generate a single UUID for predictability
     test_uuid = uuid.uuid4()
+
     with (
         patch.object(
             media_scanner,
@@ -107,6 +108,7 @@ async def test_execute_with_new_files(media_scanner: MediaScanner) -> None:
         patch.object(media_scanner, "_get_all_files", return_value=[]),
         patch.object(media_scanner, "_calculate_md5", return_value="fakehash"),
         patch.object(media_scanner, "_update_db", return_value=None),
+        # Use a single UUID for all calls to ensure consistent behavior
         patch("uuid.uuid4", return_value=test_uuid),
     ):
         result = await media_scanner.execute(
@@ -118,32 +120,47 @@ async def test_execute_with_new_files(media_scanner: MediaScanner) -> None:
         )
 
         assert isinstance(result, list)
-        assert len(result) == 2
+        assert len(result) == 4  # Two jobs per file (FILE_MATCHER and FFPROBE)
 
-        for job_request in result:
-            assert isinstance(job_request, ChildJobRequest)
-            assert job_request.job_type == JobType.FILE_MATCHER
-            assert isinstance(job_request.params, FileMatcherParams)
-            assert job_request.params.path in [
-                "/fake/path/file1.mp3",
-                "/fake/path/file2.mp3",
-            ]
-            assert job_request.params.media_type == MediaType.MUSIC
+        # Group jobs by file path
+        jobs_by_path: dict[str, list[ChildJobRequest]] = {}
+        for job in result:
+            path = (
+                job.params.path if hasattr(job.params, "path") else job.params.file_id
+            )
+            if path not in jobs_by_path:
+                jobs_by_path[path] = []
+            jobs_by_path[path].append(job)
+
+        # Verify we have jobs for both files
+        assert set(jobs_by_path.keys()) == {
+            "/fake/path/file1.mp3",
+            "/fake/path/file2.mp3",
+        }
+
+        # Verify each file has both types of jobs
+        for file_jobs in jobs_by_path.values():
+            assert len(file_jobs) == 2
+            job_types = {job.job_type for job in file_jobs}
+            assert job_types == {JobType.FILE_MATCHER, JobType.FFPROBE}
 
 
 @pytest.mark.asyncio
 async def test_execute_with_existing_files(media_scanner: MediaScanner) -> None:
     """Test execute method with some existing files."""
-    # Generate real version 4 UUIDs
-    uuid1 = uuid.uuid4()
-    uuid2 = uuid.uuid4()
+    # Generate fixed UUIDs for predictability
+    existing_uuid = uuid.uuid4()
+    new_uuid = uuid.uuid4()
 
     existing_file = FileDTO(
-        id=uuid1,
+        id=existing_uuid,
         path="/fake/path/file1.mp3",
         hash="fakehash",
         media_type=MediaType.MUSIC,
     )
+
+    async def mock_calculate_md5(path: str) -> str:
+        return "fakehash" if path == "/fake/path/file1.mp3" else "newhash"
 
     with (
         patch.object(
@@ -152,9 +169,10 @@ async def test_execute_with_existing_files(media_scanner: MediaScanner) -> None:
             return_value=["/fake/path/file1.mp3", "/fake/path/file2.mp3"],
         ),
         patch.object(media_scanner, "_get_all_files", return_value=[existing_file]),
-        patch.object(media_scanner, "_calculate_md5", return_value="fakehash"),
+        patch.object(media_scanner, "_calculate_md5", side_effect=mock_calculate_md5),
         patch.object(media_scanner, "_update_db", return_value=None),
-        patch("uuid.uuid4", return_value=uuid2),
+        # Use a single new UUID for consistency
+        patch("uuid.uuid4", return_value=new_uuid),
     ):
         result = await media_scanner.execute(
             MediaScannerParams(
@@ -165,7 +183,17 @@ async def test_execute_with_existing_files(media_scanner: MediaScanner) -> None:
         )
 
         assert isinstance(result, list)
-        assert len(result) == 1
+        assert len(result) == 2  # Two jobs for the one new file
+
+        # Verify both jobs are for the new file
+        for job in result:
+            if isinstance(job.params, FileMatcherParams):
+                assert job.job_type == JobType.FILE_MATCHER
+                assert job.params.path == "/fake/path/file2.mp3"
+                assert job.params.media_type == MediaType.MUSIC
+            else:  # FFProbeParams
+                assert job.job_type == JobType.FFPROBE
+                assert job.params.path == "/fake/path/file2.mp3"
 
 
 @pytest.mark.asyncio

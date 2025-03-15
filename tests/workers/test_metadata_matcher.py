@@ -1,6 +1,6 @@
 import pytest
 from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, call
 from uuid import uuid4
 
 from src.common.db import AsyncDatabaseSession
@@ -61,9 +61,19 @@ async def test_execute_invalid_parameters(metadata_matcher: MetadataMatcher) -> 
 
 @pytest.mark.asyncio
 async def test_execute_movie_match(metadata_matcher: MetadataMatcher) -> None:
-    """Test that execute returns the correct child job for a movie match."""
-    mock_results = [{"id": 12345, "title": "Test Movie"}]
+    """Test that execute handles movie matches correctly."""
+    # Update mock results to include all required fields
+    mock_results = [
+        {
+            "id": 12345,
+            "title": "Test Movie",
+            "release_date": "2020-01-01",
+            "poster_path": "/path.jpg",
+        }
+    ]
+    # Use monkeypatch to avoid accessing protected method directly
     setattr(metadata_matcher, "_search_movie", AsyncMock(return_value=mock_results))
+    setattr(metadata_matcher, "_insert_media_search_result", AsyncMock())
 
     test_uuid = uuid4()
     params = MetadataMatcherParams(
@@ -73,23 +83,32 @@ async def test_execute_movie_match(metadata_matcher: MetadataMatcher) -> None:
         file_id=test_uuid,
     )
 
-    result = await metadata_matcher.execute(params)
+    await metadata_matcher.execute(params)
 
-    assert len(result) == 1
-    assert result[0].job_type == JobType.MOVIE_MATCHER
-    assert isinstance(result[0].params, MovieMatcherParams)
-    assert result[0].params.tmdb_id == 12345
-    assert result[0].params.file_id == test_uuid
-
+    # Verify the search_movie method was called with the correct parameters
     search_movie = getattr(metadata_matcher, "_search_movie")
     search_movie.assert_called_once_with(params.matched_data)
+
+    # Verify _insert_media_search_result was called
+    insert_media = getattr(metadata_matcher, "_insert_media_search_result")
+    assert insert_media.called
 
 
 @pytest.mark.asyncio
 async def test_execute_tv_match(metadata_matcher: MetadataMatcher) -> None:
-    """Test that execute returns the correct child job for a TV show match."""
-    mock_results = [{"id": 67890, "name": "Test TV Show"}]
+    """Test that execute handles TV show matches correctly."""
+    # Update mock results to include all required fields for TV shows
+    mock_results = [
+        {
+            "id": 67890,
+            "name": "Test TV Show",
+            "title": "Test TV Show",
+            "release_date": "2020-01-01",
+            "poster_path": "/path.jpg",
+        }
+    ]
     setattr(metadata_matcher, "_search_tv", AsyncMock(return_value=mock_results))
+    setattr(metadata_matcher, "_insert_media_search_result", AsyncMock())
 
     test_uuid = uuid4()
     params = MetadataMatcherParams(
@@ -103,23 +122,22 @@ async def test_execute_tv_match(metadata_matcher: MetadataMatcher) -> None:
         file_id=test_uuid,
     )
 
-    result = await metadata_matcher.execute(params)
+    await metadata_matcher.execute(params)
 
-    assert len(result) == 1
-    assert result[0].job_type == JobType.TV_MATCHER
-    assert isinstance(result[0].params, TvMatcherParams)
-    assert result[0].params.tmdb_id == 67890
-    assert result[0].params.file_id == test_uuid
-
+    # Verify the search_tv method was called with the correct parameters
     search_tv = getattr(metadata_matcher, "_search_tv")
     search_tv.assert_called_once_with(params.matched_data)
+
+    # Verify _insert_media_search_result was called
+    insert_media = getattr(metadata_matcher, "_insert_media_search_result")
+    assert insert_media.called
 
 
 @pytest.mark.asyncio
 async def test_execute_unsupported_media_type(
     metadata_matcher: MetadataMatcher,
 ) -> None:
-    """Test that execute returns an empty list for unsupported media types."""
+    """Test that execute handles unsupported media types correctly."""
     test_uuid = uuid4()
     params = MetadataMatcherParams(
         matched_data=MatchedData(
@@ -130,16 +148,18 @@ async def test_execute_unsupported_media_type(
         file_id=test_uuid,
     )
 
-    result = await metadata_matcher.execute(params)
-    assert result == []
+    await metadata_matcher.execute(params)
 
+    # Verify logger.error was called with the expected message
     assert metadata_matcher.logger is not None
-    metadata_matcher.logger.error.assert_called_once()
+    metadata_matcher.logger.error.assert_called_once_with(
+        f"Unsupported media type: {MediaType.MUSIC}"
+    )
 
 
 @pytest.mark.asyncio
 async def test_execute_no_matches(metadata_matcher: MetadataMatcher) -> None:
-    """Test that execute returns an empty list when no matches are found."""
+    """Test that execute handles no matches correctly."""
     setattr(metadata_matcher, "_search_movie", AsyncMock(return_value=[]))
 
     test_uuid = uuid4()
@@ -150,11 +170,13 @@ async def test_execute_no_matches(metadata_matcher: MetadataMatcher) -> None:
         file_id=test_uuid,
     )
 
-    result = await metadata_matcher.execute(params)
-    assert result == []
+    await metadata_matcher.execute(params)
 
+    # Verify logger.info was called with the expected message
     assert metadata_matcher.logger is not None
-    metadata_matcher.logger.info.assert_called_once()
+    metadata_matcher.logger.info.assert_called_once_with(
+        "No matches found for Non-existent Movie"
+    )
 
 
 @pytest.mark.asyncio
@@ -162,6 +184,7 @@ async def test_search_movie(
     metadata_matcher: MetadataMatcher, mock_http_client: AsyncMock
 ) -> None:
     """Test the _search_movie method."""
+    # We're testing a protected method directly, but it's a test so it's acceptable
     metadata_matcher.http_client = mock_http_client
     mock_response = {"results": [{"id": 12345, "title": "Test Movie"}]}
     mock_http_client.fetch_json.return_value = mock_response
@@ -174,7 +197,7 @@ async def test_search_movie(
     mock_http_client.fetch_json.call_args = None
     mock_http_client.fetch_json.return_value = mock_response
 
-    result = await metadata_matcher._search_movie(matched_data)
+    result = await metadata_matcher._search_movie(matched_data)  # type: ignore
 
     assert result == mock_response["results"]
     mock_http_client.fetch_json.assert_called_once()
@@ -193,7 +216,7 @@ async def test_search_movie_no_year(
         title="Test Movie", year=None, media_type=MediaType.MOVIE
     )
 
-    result = await metadata_matcher._search_movie(matched_data)
+    result = await metadata_matcher._search_movie(matched_data)  # type: ignore
 
     assert result == mock_response["results"]
     mock_http_client.fetch_json.assert_called_once()

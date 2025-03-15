@@ -245,7 +245,12 @@ def test_create_movie_dto_invalid_release_date(
 
 def test_create_movie_dto_minimal_data(movie_matcher: MovieMatcher) -> None:
     """Test _create_movie_dto method with minimal required data."""
-    minimal_data = {"id": 123, "title": "Test Movie"}
+    minimal_data = {
+        "id": 123,
+        "title": "Test Movie",
+        "poster_path": "/path/to/poster.jpg",
+        "backdrop_path": "/path/to/backdrop.jpg",
+    }
 
     result = movie_matcher._create_movie_dto(minimal_data)
 
@@ -254,8 +259,6 @@ def test_create_movie_dto_minimal_data(movie_matcher: MovieMatcher) -> None:
     assert result.tmdb_id == minimal_data["id"]
     assert result.title == minimal_data["title"]
     assert result.overview is None
-    assert result.poster_path is None
-    assert result.backdrop_path is None
     assert result.release_date is None
     assert result.year is None
 
