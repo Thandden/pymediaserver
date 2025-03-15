@@ -3,11 +3,11 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mediaserver"
+name = "media-server"
 version = "0.1.0"
-description = "Media server application"
+description = "Media Server Application"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 dependencies = [
     "aiofiles>=24.1.0",
@@ -23,7 +23,15 @@ dependencies = [
     "watchdog>=6.0.0",
     "python-dotenv>=1.0.1",
     "mypy>=1.15.0",
+    "flask>=3.1.0",
+    "hypercorn>=0.17.3",
+    "aiodns>=3.2.0",
+    "certifi>=2025.1.31",
+    "uvloop>=0.21.0",
 ]
 
 [tool.setuptools]
 package-dir = {"" = "."}
+
+[tool.ruff]
+target-version = "py310"
